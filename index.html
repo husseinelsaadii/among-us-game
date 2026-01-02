@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Recursion Shorts — Self-contained 4K Vertical Stage</title>
+  <style>
+    :root{
+      /* Stage (logical 4K portrait) */
+      --W: 2160;
+      --H: 3840;
+
+      /* Color system */
+      --bg0:#070A12;
+      --bg1:#0A0F1F;
+      --bg2:#0B1B2A;
+      --ink:#EAF0FF;
+      --muted: rgba(234,240,255,.75);
+      --muted2: rgba(234,240,255,.55);
+
+      --a:#7C3AED; /* purple */
+      --b:#22D3EE; /* cyan */
+      --c:#34D399; /* green */
+      --warn:#F59E0B;
+      --danger:#EF4444;
+
+      --glass: rgba(255,255,255,.08);
+      --glass2: rgba(255,255,255,.12);
+      --stroke: rgba(255,255,255,.16);
+      --stroke2: rgba(255,255,255,.10);
+
+      --shadow: 0 20px 80px rgba(0,0,0,.55);
+      --shadow2: 0 10px 40px rgba(0,0,0,.45);
+
+      --radius: 44px;
+      --radius2: 28px;
+
+      /* Typography (system premium stack) */
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+      /* Motion */
+      --easeOut: cubic-bezier(.12,.92,.2,1);
+      --easeInOut: cubic-bezier(.68,0,.32,1);
+      --easeBack: cubic-bezier(.2,1.35,.25,1);
+
+      /* UI scale (controlled by JS) */
+      --scale: 1;
+
+      /* Safe area (approx Shorts crop + UI) */
+      --safeTop: 220px;
+      --safeBottom: 320px;
+      --safeX: 190px;
+
+      /* Progress */
+      --p: 0%;
+    }
+
+    /* Page */
+    html,body{height:100%; margin:0; background:#000; color:var(--ink); font-family:var(--font); overflow:hidden;}
+    body{
+      display:flex; align-items:center; justify-content:center;
+      background:
+        radial-gradient(1200px 1200px at 10% 15%, rgba(124,58,237,.25), transparent 60%),
+        radial-gradient(1100px 900px at 90% 20%, rgba(34,211,238,.18), transparent 55%),
+        radial-gradient(1400px 1100px at 50% 100%, rgba(52,211,153,.10), transparent 55%),
+        linear-gradient(180deg, #02030A 0%, #050712 40%, #01020A 100%);
+    }
+
+    /* Viewport wrapper */
+    #viewport{
+      position:relative;
+      width:100vw; height:100vh;
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+      isolation:isolate;
+    }
+
+    /* Letterbox background */
+    #letterboxGlow{
+      position:absolute; inset:-40px;
+      background:
+        radial-gradient(1400px 1400px at 50% 30%, rgba(124,58,237,.14), transparent 60%),
+        radial-gradient(1300px 900px at 50% 65%, rgba(34,211,238,.10), transparent 55%),
+        radial-gradient(1200px 900px at 50% 80%, rgba(52,211,153,.08), transparent 60%);
+      filter: blur(10px);
+      opacity:.9;
+      z-index:0;
+      transform: translateZ(0);
+    }
+
+    /* Stage container scales to fit */
+    #stageWrap{
+      position:relative;
+      width: calc(var(--W) * 1px);
+      height: calc(var(--H) * 1px);
+      transform: scale(var(--scale));
+      transform-origin: center center;
+      z-index:2;
+      will-change: transform;
+      filter: drop-shadow(0 60px 160px rgba(0,0,0,.65));
+    }
+
+    /* Stage */
+    #stage{
+      position:absolute; inset:0;
+      border-radius: 64px;
+      overflow:hidden;
+      background:
+        radial-gradient(1400px 900px at 70% 10%, rgba(124,58,237,.18), transparent 55%),
+        radial-gradient(1200px 900px at 30% 20%, rgba(34,211,238,.12), transparent 55%),
+        radial-gradient(1400px 1200px at 50% 100%, rgba(52,211,153,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 55%, var(--bg0) 100%);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 0 0 2px rgba(0,0,0,.55) inset;
+      transform: translateZ(0);
+    }
+
+    /* Subtle grid + noise */
+    #stage::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(900px 700px at 20% 10%, rgba(255,255,255,.06), transparent 65%),
+        radial-gradient(900px 700px at 80% 20%, rgba(255,255,255,.05), transparent 65%),
+        radial-gradient(900px 700px at 50% 90%, rgba(255,255,255,.04), transparent 70%),
+        linear-gradient(transparent, transparent),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, transparent 1px, transparent 120px),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0px, rgba(255,255,255,.05) 1px, transparent 1px, transparent 120px);
+      opacity:.14;
+      mix-blend-mode: screen;
+      pointer-events:none;
+      transform: translateZ(0);
+    }
+
+    #stage::after{
+      content:"";
+      position:absolute; inset:0;
+      pointer-events:none;
+      opacity:.085;
+      mix-blend-mode: overlay;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+      background-size: 420px 420px;
+      transform: translateZ(0);
+    }
+
+    /* Camera for 3D-ish parallax */
+    #camera{
+      position:absolute; inset:0;
+      perspective: 2200px;
+      transform: translateZ(0);
+    }
+    #scene{
+      position:absolute; inset:0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* Top chrome */
+    #topBar{
+      position:absolute;
+      top: 110px; left: 120px; right: 120px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 24px;
+      z-index:10;
+      transform: translateZ(60px);
+    }
+    .pill{
+      display:flex; align-items:center; gap:16px;
+      padding: 22px 28px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 24px 70px rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+    }
+    .dot{
+      width: 16px; height: 16px; border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.9), rgba(255,255,255,.1));
+      box-shadow: 0 0 0 6px rgba(124,58,237,.18), 0 0 30px rgba(124,58,237,.35);
+    }
+    #brand{
+      font-weight: 800;
+      letter-spacing: .28em;
+      font-size: 30px;
+      text-transform: uppercase;
+      opacity:.95;
+    }
+    #subbrand{
+      font-size: 26px;
+      letter-spacing: .02em;
+      color: var(--muted2);
+      margin-left: 8px;
+    }
+    #status{
+      display:flex; align-items:center; gap:14px;
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 28px;
+      letter-spacing: .01em;
+    }
+    .pulse{
+      width: 14px; height: 14px; border-radius: 999px;
+      background: radial-gradient(circle, rgba(34,211,238,.95), rgba(34,211,238,.35) 60%, transparent 70%);
+      box-shadow: 0 0 22px rgba(34,211,238,.45);
+      position:relative;
+    }
+    .pulse::after{
+      content:"";
+      position:absolute; inset:-18px;
+      border-radius:999px;
+      border: 2px solid rgba(34,211,238,.22);
+      animation: ring 2.2s var(--easeInOut) infinite;
+    }
+    @keyframes ring{
+      0%{transform:scale(.2); opacity:.0;}
+      30%{opacity:.85;}
+      100%{transform:scale(1); opacity:0;}
+    }
+
+    /* Main layout */
+    #main{
+      position:absolute;
+      left: 120px; right: 120px;
+      top: 290px; bottom: 430px;
+      display:grid;
+      grid-template-columns: 1.06fr .94fr;
+      gap: 70px;
+      z-index:5;
+      transform-style: preserve-3d;
+    }
+
+    /* Panels */
+    .panel{
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 40px 120px rgba(0,0,0,.40);
+      backdrop-filter: blur(12px);
+      overflow:hidden;
+      position:relative;
+      transform-style: preserve-3d;
+    }
+    .panel::before{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        radial-gradient(900px 700px at 0% 0%, rgba(124,58,237,.20), transparent 55%),
+        radial-gradient(900px 700px at 100% 0%, rgba(34,211,238,.14), transparent 55%),
+        radial-gradient(900px 900px at 50% 120%, rgba(52,211,153,.10), transparent 60%);
+      opacity:.55;
+      pointer-events:none;
+      transform: translateZ(-1px);
+    }
+    .panelHeader{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 44px 52px 34px;
+      position:relative;
+      z-index:2;
+    }
+    .panelTitle{
+      font-size: 44px;
+      font-weight: 850;
+      letter-spacing: .02em;
+    }
+    .panelHint{
+      font-size: 28px;
+      color: var(--muted2);
+      font-weight: 650;
+      letter-spacing: .01em;
+      display:flex; align-items:center; gap:10px;
+    }
+    .badge{
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      font-size: 22px;
+      color: var(--muted);
+    }
+
+    /* Code block */
+    #codeWrap{
+      padding: 0 52px 52px;
+      position:relative;
+      z-index:3;
+    }
+    #code{
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(0,0,0,.46), rgba(0,0,0,.30));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 24px 80px rgba(0,0,0,.50);
+      padding: 42px 44px;
+      font-family: var(--mono);
+      font-size: 30px;
+      line-height: 1.55;
+      position:relative;
+      overflow:hidden;
+    }
+    #code .line{
+      display:flex; gap: 18px;
+      position:relative;
+      padding: 10px 10px;
+      border-radius: 18px;
+    }
+    #code .ln{
+      width: 42px; color: rgba(234,240,255,.33);
+      text-align:right; user-select:none;
+    }
+    #code .txt{white-space:pre;}
+    .kw{color: #A78BFA; font-weight: 700;}
+    .fn{color: #67E8F9; font-weight: 700;}
+    .num{color: #34D399; font-weight: 750;}
+    .op{color: rgba(234,240,255,.85);}
+    .cm{color: rgba(234,240,255,.38);}
+    .id{color: rgba(234,240,255,.92); font-weight: 650;}
+    .hl{
+      background: linear-gradient(90deg, rgba(34,211,238,.0), rgba(34,211,238,.10), rgba(124,58,237,.10), rgba(34,211,238,.0));
+      box-shadow: 0 0 0 1px rgba(34,211,238,.22) inset, 0 0 60px rgba(34,211,238,.12);
+    }
+    .hlBase{
+      background: linear-gradient(90deg, rgba(245,158,11,.0), rgba(245,158,11,.14), rgba(245,158,11,.08), rgba(245,158,11,.0));
+      box-shadow: 0 0 0 1px rgba(245,158,11,.26) inset, 0 0 70px rgba(245,158,11,.14);
+    }
+    .hlReturn{
+      background: linear-gradient(90deg, rgba(52,211,153,.0), rgba(52,211,153,.12), rgba(52,211,153,.08), rgba(52,211,153,.0));
+      box-shadow: 0 0 0 1px rgba(52,211,153,.22) inset, 0 0 70px rgba(52,211,153,.10);
+    }
+
+    /* Call stack panel */
+    #stackBody{
+      padding: 0 52px 52px;
+      position:relative;
+      z-index:3;
+      height: calc(100% - 120px);
+      display:flex;
+      flex-direction:column;
+      gap: 26px;
+    }
+    #stackArea{
+      position:relative;
+      flex:1;
+      border-radius: 38px;
+      background: linear-gradient(180deg, rgba(0,0,0,.44), rgba(0,0,0,.28));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 26px 90px rgba(0,0,0,.55);
+      overflow:hidden;
+      transform-style: preserve-3d;
+    }
+    #stackArea::before{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        radial-gradient(700px 500px at 30% 0%, rgba(34,211,238,.16), transparent 60%),
+        radial-gradient(800px 600px at 75% 10%, rgba(124,58,237,.18), transparent 60%);
+      opacity:.55;
+      pointer-events:none;
+    }
+    #stackDeck{
+      position:absolute; left: 90px; right: 90px; top: 110px; bottom: 90px;
+      transform: rotateX(10deg) rotateY(-10deg) translateZ(0);
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .frame{
+      position:absolute;
+      left: 0; right: 0;
+      height: 260px;
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.07));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 22px 70px rgba(0,0,0,.52);
+      backdrop-filter: blur(10px);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 44px 44px;
+      transform-style: preserve-3d;
+      opacity: 0;
+      transform: translateY(120px) scale(.96) translateZ(0);
+      will-change: transform, opacity;
+      overflow:hidden;
+    }
+    .frame::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(420px 280px at 10% 20%, rgba(34,211,238,.22), transparent 60%),
+        radial-gradient(520px 340px at 90% 30%, rgba(124,58,237,.20), transparent 62%);
+      opacity:.55;
+      pointer-events:none;
+      transform: translateZ(-1px);
+    }
+    .frame .left{
+      display:flex; flex-direction:column; gap: 10px;
+      position:relative; z-index:2;
+    }
+    .frame .call{
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: .01em;
+    }
+    .frame .meta{
+      font-size: 26px;
+      color: var(--muted2);
+      font-weight: 650;
+      letter-spacing: .01em;
+      display:flex; gap: 12px; align-items:center;
+    }
+    .chip{
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      color: rgba(234,240,255,.85);
+      font-size: 22px;
+    }
+    .frame .right{
+      display:flex; align-items:flex-end; gap: 18px;
+      position:relative; z-index:2;
+    }
+    .retLabel{
+      font-size: 24px;
+      color: rgba(234,240,255,.55);
+      font-weight: 700;
+      letter-spacing:.08em;
+      text-transform: uppercase;
+      transform: translateY(-6px);
+    }
+    .retVal{
+      font-size: 86px;
+      font-weight: 950;
+      letter-spacing: -.02em;
+      background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(34,211,238,.85), rgba(124,58,237,.82));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 10px 30px rgba(34,211,238,.18));
+      opacity: .0;
+      transform: translateY(20px) scale(.98);
+      will-change: transform, opacity;
+    }
+    .frame.active{
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.18) inset,
+        0 0 0 2px rgba(34,211,238,.10) inset,
+        0 36px 110px rgba(0,0,0,.58),
+        0 0 140px rgba(34,211,238,.10);
+    }
+    .frame.base{
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.18) inset,
+        0 0 0 2px rgba(245,158,11,.14) inset,
+        0 36px 110px rgba(0,0,0,.58),
+        0 0 160px rgba(245,158,11,.12);
+    }
+
+    /* Value bubble that travels upward on unwind */
+    #valueBubble{
+      position:absolute;
+      width: 260px;
+      height: 140px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 28px 90px rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      display:flex; align-items:center; justify-content:center;
+      font-size: 66px;
+      font-weight: 950;
+      letter-spacing: -.02em;
+      color: transparent;
+      background-image: linear-gradient(90deg, rgba(255,255,255,.96), rgba(52,211,153,.88));
+      -webkit-background-clip:text;
+      background-clip:text;
+      opacity: 0;
+      transform: translate3d(0,0,0) scale(.92);
+      will-change: transform, opacity;
+      pointer-events:none;
+      z-index:6;
+    }
+
+    /* Right panel helper row */
+    #stackLegend{
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 24px;
+    }
+    .legendItem{
+      display:flex; align-items:center; gap: 12px;
+      color: var(--muted2);
+      font-size: 26px;
+      font-weight: 650;
+    }
+    .legendSwatch{
+      width: 18px; height: 18px; border-radius: 99px;
+      box-shadow: 0 0 0 6px rgba(255,255,255,.06);
+    }
+    .swC{ background: radial-gradient(circle at 30% 30%, rgba(52,211,153,.95), rgba(52,211,153,.25));}
+    .swB{ background: radial-gradient(circle at 30% 30%, rgba(34,211,238,.95), rgba(34,211,238,.25));}
+    .swW{ background: radial-gradient(circle at 30% 30%, rgba(245,158,11,.95), rgba(245,158,11,.25));}
+
+    /* Captions */
+    #captions{
+      position:absolute;
+      left: 120px; right: 120px;
+      bottom: 260px;
+      z-index:20;
+      transform: translateZ(120px);
+      display:flex;
+      justify-content:center;
+      pointer-events:none;
+    }
+    #capCard{
+      width: min(1700px, 100%);
+      border-radius: 44px;
+      padding: 46px 56px;
+      background: linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.28));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 30px 120px rgba(0,0,0,.60);
+      backdrop-filter: blur(12px);
+      position:relative;
+      overflow:hidden;
+    }
+    #capCard::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(680px 360px at 20% 10%, rgba(34,211,238,.16), transparent 60%),
+        radial-gradient(720px 420px at 85% 30%, rgba(124,58,237,.16), transparent 62%);
+      opacity:.75;
+      pointer-events:none;
+    }
+    #capLine1{
+      font-size: 68px;
+      font-weight: 950;
+      letter-spacing: -.02em;
+      line-height: 1.08;
+      text-align:center;
+      position:relative; z-index:2;
+    }
+    #capLine2{
+      margin-top: 18px;
+      font-size: 36px;
+      font-weight: 650;
+      color: var(--muted);
+      letter-spacing: .01em;
+      line-height: 1.25;
+      text-align:center;
+      position:relative; z-index:2;
+    }
+    .capEm{
+      color: transparent;
+      background-image: linear-gradient(90deg, rgba(255,255,255,.96), rgba(34,211,238,.88), rgba(124,58,237,.86));
+      -webkit-background-clip:text;
+      background-clip:text;
+      filter: drop-shadow(0 12px 30px rgba(34,211,238,.12));
+    }
+    .capWarn{
+      color: transparent;
+      background-image: linear-gradient(90deg, rgba(255,255,255,.96), rgba(245,158,11,.90));
+      -webkit-background-clip:text;
+      background-clip:text;
+      filter: drop-shadow(0 12px 30px rgba(245,158,11,.12));
+    }
+
+    /* Progress + chapters */
+    #progress{
+      position:absolute;
+      left: 120px; right: 120px;
+      bottom: 90px;
+      z-index:30;
+      transform: translateZ(120px);
+    }
+    #progBar{
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      overflow:hidden;
+      position:relative;
+    }
+    #progFill{
+      position:absolute; inset:0;
+      width: var(--p);
+      background: linear-gradient(90deg, rgba(34,211,238,.85), rgba(124,58,237,.80), rgba(52,211,153,.82));
+      box-shadow: 0 0 40px rgba(34,211,238,.18);
+    }
+    #ticks{
+      position:relative;
+      display:flex;
+      justify-content:space-between;
+      margin-top: 22px;
+      color: rgba(234,240,255,.52);
+      font-size: 22px;
+      font-weight: 750;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      user-select:none;
+    }
+    .tick{
+      position:relative;
+      padding-top: 14px;
+    }
+    .tick::before{
+      content:"";
+      position:absolute;
+      top:-22px;
+      left:50%;
+      width: 2px; height: 18px;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,.22);
+      box-shadow: 0 0 0 1px rgba(0,0,0,.35);
+    }
+    .tick strong{
+      color: rgba(234,240,255,.78);
+      letter-spacing: .08em;
+    }
+
+    /* Minimal controls */
+    #controls{
+      position:absolute;
+      right: 90px;
+      bottom: 210px;
+      z-index:40;
+      transform: translateZ(140px);
+      display:flex;
+      flex-direction:column;
+      gap: 14px;
+      align-items:flex-end;
+      pointer-events:auto;
+    }
+    .ctrlRow{
+      display:flex; gap: 12px; align-items:center;
+    }
+    button.ctrl{
+      appearance:none;
+      border:0;
+      padding: 18px 22px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      color: rgba(234,240,255,.92);
+      font-weight: 800;
+      letter-spacing:.02em;
+      font-size: 22px;
+      cursor:pointer;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 18px 55px rgba(0,0,0,.45);
+      backdrop-filter: blur(10px);
+      transform: translateZ(0);
+      transition: transform .15s var(--easeOut), box-shadow .15s var(--easeOut);
+    }
+    button.ctrl:hover{ transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(255,255,255,.16) inset, 0 22px 70px rgba(0,0,0,.55); }
+    button.ctrl:active{ transform: translateY(1px) scale(.98); }
+    button.ctrl.small{
+      padding: 14px 18px;
+      font-size: 20px;
+      border-radius: 16px;
+      opacity:.92;
+    }
+    #scrub{
+      width: 560px;
+      accent-color: #67E8F9;
+      filter: drop-shadow(0 14px 30px rgba(0,0,0,.45));
+    }
+
+    /* Start overlay fallback */
+    #startOverlay{
+      position:absolute; inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:100;
+      background: radial-gradient(1400px 900px at 50% 30%, rgba(124,58,237,.18), rgba(0,0,0,.68) 70%);
+      backdrop-filter: blur(10px);
+      transition: opacity .35s var(--easeOut);
+    }
+    #startOverlay.hidden{ opacity:0; pointer-events:none; }
+    #startCard{
+      width: 1600px;
+      border-radius: 64px;
+      padding: 86px 90px;
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 60px 160px rgba(0,0,0,.65);
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+    }
+    #startCard::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(900px 600px at 15% 20%, rgba(34,211,238,.18), transparent 60%),
+        radial-gradient(900px 600px at 85% 30%, rgba(124,58,237,.18), transparent 62%);
+      opacity:.85;
+      pointer-events:none;
+    }
+    #startTitle{
+      font-size: 92px;
+      font-weight: 1000;
+      letter-spacing: -.03em;
+      margin: 0;
+      position:relative; z-index:2;
+    }
+    #startSub{
+      margin: 22px 0 52px;
+      font-size: 34px;
+      font-weight: 650;
+      color: rgba(234,240,255,.78);
+      position:relative; z-index:2;
+    }
+    #startBtn{
+      margin-top: 12px;
+      padding: 26px 40px;
+      border-radius: 22px;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing:.03em;
+      background: linear-gradient(90deg, rgba(34,211,238,.92), rgba(124,58,237,.86));
+      color: #07101B;
+      border:0;
+      cursor:pointer;
+      box-shadow: 0 28px 90px rgba(34,211,238,.18), 0 0 0 1px rgba(255,255,255,.10) inset;
+      position:relative; z-index:2;
+      transition: transform .18s var(--easeBack), filter .18s var(--easeOut);
+    }
+    #startBtn:hover{ transform: translateY(-3px) scale(1.02); filter: brightness(1.05); }
+    #startBtn:active{ transform: translateY(1px) scale(.99); }
+
+    /* Safe area overlay */
+    #safeArea{
+      position:absolute; inset:0;
+      z-index:90;
+      pointer-events:none;
+      opacity:0;
+      transition: opacity .2s var(--easeOut);
+    }
+    #safeArea.on{ opacity:1; }
+    #safeRect{
+      position:absolute;
+      left: var(--safeX);
+      right: var(--safeX);
+      top: var(--safeTop);
+      bottom: var(--safeBottom);
+      border-radius: 54px;
+      border: 4px dashed rgba(255,255,255,.22);
+      box-shadow: 0 0 0 1px rgba(0,0,0,.6) inset;
+    }
+    #safeLabel{
+      position:absolute;
+      left: calc(var(--safeX) + 20px);
+      top: calc(var(--safeTop) - 64px);
+      font-size: 22px;
+      letter-spacing:.10em;
+      text-transform: uppercase;
+      color: rgba(234,240,255,.70);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.35);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      backdrop-filter: blur(10px);
+    }
+
+    /* Summary cards (scene 5) */
+    #summary{
+      position:absolute;
+      left: 120px; right: 120px;
+      top: 920px;
+      z-index:25;
+      transform: translateZ(110px);
+      display:flex;
+      justify-content:center;
+      gap: 40px;
+      pointer-events:none;
+      opacity:0;
+      will-change: opacity, transform;
+    }
+    .rule{
+      width: 760px;
+      border-radius: 44px;
+      padding: 46px 50px;
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 40px 120px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      position:relative;
+      overflow:hidden;
+    }
+    .rule::before{
+      content:"";
+      position:absolute; inset:-2px;
+      opacity:.75;
+      pointer-events:none;
+    }
+    .rule.base::before{
+      background: radial-gradient(800px 520px at 30% 30%, rgba(245,158,11,.18), transparent 60%),
+                  radial-gradient(800px 520px at 90% 30%, rgba(255,255,255,.08), transparent 65%);
+    }
+    .rule.step::before{
+      background: radial-gradient(800px 520px at 30% 30%, rgba(52,211,153,.16), transparent 60%),
+                  radial-gradient(800px 520px at 90% 30%, rgba(34,211,238,.12), transparent 65%);
+    }
+    .rule h3{
+      margin:0;
+      font-size: 42px;
+      font-weight: 950;
+      letter-spacing: -.01em;
+      position:relative; z-index:2;
+    }
+    .rule p{
+      margin: 16px 0 0;
+      font-size: 30px;
+      color: rgba(234,240,255,.78);
+      font-weight: 650;
+      line-height: 1.25;
+      position:relative; z-index:2;
+    }
+    .rule .tag{
+      display:inline-flex; align-items:center; gap:10px;
+      margin-top: 26px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.28);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      font-size: 22px;
+      letter-spacing:.08em;
+      text-transform: uppercase;
+      color: rgba(234,240,255,.70);
+      position:relative; z-index:2;
+    }
+    .tag .miniDot{width:10px; height:10px; border-radius:99px; background: rgba(255,255,255,.65); box-shadow:0 0 18px rgba(255,255,255,.22);}
+    .tag.warn .miniDot{background: rgba(245,158,11,.9); box-shadow:0 0 18px rgba(245,158,11,.22);}
+    .tag.good .miniDot{background: rgba(52,211,153,.9); box-shadow:0 0 18px rgba(52,211,153,.22);}
+
+    /* End CTA card */
+    #endCard{
+      position:absolute;
+      left: 120px; right: 120px;
+      top: 560px;
+      z-index:26;
+      transform: translateZ(120px);
+      display:flex;
+      justify-content:center;
+      pointer-events:none;
+      opacity:0;
+      will-change: opacity, transform;
+    }
+    #endInner{
+      width: 1750px;
+      border-radius: 64px;
+      padding: 72px 70px;
+      background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.22));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 50px 170px rgba(0,0,0,.70);
+      backdrop-filter: blur(12px);
+      position:relative;
+      overflow:hidden;
+      text-align:center;
+    }
+    #endInner::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(900px 600px at 30% 30%, rgba(34,211,238,.16), transparent 60%),
+        radial-gradient(900px 600px at 70% 30%, rgba(124,58,237,.16), transparent 60%),
+        radial-gradient(900px 600px at 50% 110%, rgba(52,211,153,.12), transparent 65%);
+      opacity:.85;
+      pointer-events:none;
+    }
+    #endHeadline{
+      margin:0;
+      font-size: 86px;
+      font-weight: 1000;
+      letter-spacing: -.03em;
+      position:relative; z-index:2;
+    }
+    #endSub{
+      margin: 18px 0 0;
+      font-size: 34px;
+      font-weight: 650;
+      color: rgba(234,240,255,.80);
+      position:relative; z-index:2;
+    }
+    #endCTA{
+      margin-top: 36px;
+      display:inline-flex;
+      align-items:center;
+      gap: 14px;
+      padding: 18px 22px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(34,211,238,.90), rgba(124,58,237,.86));
+      color: #07101B;
+      font-weight: 950;
+      font-size: 28px;
+      letter-spacing:.02em;
+      box-shadow: 0 28px 90px rgba(34,211,238,.16), 0 0 0 1px rgba(255,255,255,.08) inset;
+      position:relative; z-index:2;
+    }
+    #endCTA .arrow{
+      width: 14px; height: 14px;
+      border-right: 4px solid #07101B;
+      border-top: 4px solid #07101B;
+      transform: rotate(45deg) translateY(1px);
+    }
+
+    /* Utility: subtle text glow on emphasis */
+    .glow{
+      text-shadow: 0 0 24px rgba(34,211,238,.20), 0 0 70px rgba(124,58,237,.15);
+    }
+
+    /* Reduced motion hint */
+    #rmHint{
+      position:absolute;
+      left: 90px; bottom: 210px;
+      z-index:200;
+      transform: translateZ(160px);
+      opacity:0;
+      pointer-events:none;
+      font-size: 22px;
+      color: rgba(234,240,255,.68);
+      padding: 12px 16px;
+      border-radius: 18px;
+      background: rgba(0,0,0,.35);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset;
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <div id="letterboxGlow" aria-hidden="true"></div>
+
+    <div id="stageWrap">
+      <div id="stage">
+        <div id="camera">
+          <div id="scene">
+
+            <!-- TOP CHROME -->
+            <div id="topBar">
+              <div class="pill" aria-label="Brand">
+                <div class="dot" aria-hidden="true"></div>
+                <div>
+                  <div id="brand">RECURSION</div>
+                  <div id="subbrand">45–60s • 3D explainer</div>
+                </div>
+              </div>
+
+              <div class="pill" aria-label="Status">
+                <div id="status">
+                  <span class="pulse" aria-hidden="true"></span>
+                  <span id="statusText">PLAYING</span>
+                  <span class="badge" id="timeReadout">0:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- MAIN GRID -->
+            <div id="main" role="presentation">
+
+              <!-- CODE PANEL -->
+              <section class="panel" aria-label="Code panel" style="transform: translateZ(40px);">
+                <div class="panelHeader">
+                  <div class="panelTitle">The function</div>
+                  <div class="panelHint"><span class="badge">Python-ish</span> <span class="badge">factorial</span></div>
+                </div>
+
+                <div id="codeWrap">
+                  <div id="code" aria-label="Recursion code">
+                    <div class="line" data-line="1"><div class="ln">1</div><div class="txt"><span class="kw">def</span> <span class="fn">fact</span>(<span class="id">n</span>):</div></div>
+                    <div class="line" data-line="2"><div class="ln">2</div><div class="txt">    <span class="kw">if</span> <span class="id">n</span> <span class="op">==</span> <span class="num">1</span>:</div></div>
+                    <div class="line" data-line="3"><div class="ln">3</div><div class="txt">        <span class="kw">return</span> <span class="num">1</span>  <span class="cm"># base case</span></div></div>
+                    <div class="line" data-line="4"><div class="ln">4</div><div class="txt">    <span class="kw">return</span> <span class="id">n</span> <span class="op">*</span> <span class="fn">fact</span>(<span class="id">n</span><span class="op">-</span><span class="num">1</span>)</div></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- STACK PANEL -->
+              <section class="panel" aria-label="Call stack panel" style="transform: translateZ(60px);">
+                <div class="panelHeader">
+                  <div class="panelTitle">The real story</div>
+                  <div class="panelHint">
+                    <span class="badge">Call stack</span>
+                    <span class="badge">push / pop</span>
+                  </div>
+                </div>
+
+                <div id="stackBody">
+                  <div id="stackLegend" aria-hidden="true">
+                    <div class="legendItem"><span class="legendSwatch swB"></span>Push (deeper)</div>
+                    <div class="legendItem"><span class="legendSwatch swW"></span>Base case</div>
+                    <div class="legendItem"><span class="legendSwatch swC"></span>Return (unwind)</div>
+                  </div>
+
+                  <div id="stackArea">
+                    <div id="stackDeck">
+                      <!-- Frames (pre-created, animated by JS) -->
+                      <div class="frame" id="f0" data-level="0">
+                        <div class="left">
+                          <div class="call">fact(<span class="capEm">4</span>)</div>
+                          <div class="meta"><span class="chip">n = 4</span><span class="chip">needs fact(3)</span></div>
+                        </div>
+                        <div class="right">
+                          <div class="retLabel">return</div>
+                          <div class="retVal" data-ret="0">24</div>
+                        </div>
+                      </div>
+
+                      <div class="frame" id="f1" data-level="1">
+                        <div class="left">
+                          <div class="call">fact(<span class="capEm">3</span>)</div>
+                          <div class="meta"><span class="chip">n = 3</span><span class="chip">needs fact(2)</span></div>
+                        </div>
+                        <div class="right">
+                          <div class="retLabel">return</div>
+                          <div class="retVal" data-ret="1">6</div>
+                        </div>
+                      </div>
+
+                      <div class="frame" id="f2" data-level="2">
+                        <div class="left">
+                          <div class="call">fact(<span class="capEm">2</span>)</div>
+                          <div class="meta"><span class="chip">n = 2</span><span class="chip">needs fact(1)</span></div>
+                        </div>
+                        <div class="right">
+                          <div class="retLabel">return</div>
+                          <div class="retVal" data-ret="2">2</div>
+                        </div>
+                      </div>
+
+                      <div class="frame" id="f3" data-level="3">
+                        <div class="left">
+                          <div class="call">fact(<span class="capWarn">1</span>)</div>
+                          <div class="meta"><span class="chip">n = 1</span><span class="chip">STOP</span></div>
+                        </div>
+                        <div class="right">
+                          <div class="retLabel">return</div>
+                          <div class="retVal" data-ret="3">1</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="valueBubble" aria-hidden="true">1</div>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+
+            <!-- SUMMARY RULES (Scene 5) -->
+            <div id="summary" aria-hidden="true">
+              <div class="rule base">
+                <h3><span class="capWarn">Rule 1:</span> Base case</h3>
+                <p>The “stop condition” that prevents infinite calls.</p>
+                <div class="tag warn"><span class="miniDot"></span> Safety brake</div>
+              </div>
+              <div class="rule step">
+                <h3><span class="capEm">Rule 2:</span> Smaller step</h3>
+                <p>Each call moves closer to the base case.</p>
+                <div class="tag good"><span class="miniDot"></span> Progress guaranteed</div>
+              </div>
+            </div>
+
+            <!-- END CARD (Scene 5) -->
+            <div id="endCard" aria-hidden="true">
+              <div id="endInner">
+                <h2 id="endHeadline"><span class="capEm">Recursion</span> = stack + returns</h2>
+                <div id="endSub">Want <span class="capEm">Fibonacci</span> next (and why it explodes)?</div>
+                <div id="endCTA"><span>Comment “FIB”</span><span class="arrow" aria-hidden="true"></span></div>
+              </div>
+            </div>
+
+            <!-- CAPTIONS -->
+            <div id="captions" aria-live="polite">
+              <div id="capCard">
+                <div id="capLine1" class="glow">Recursion feels like magic…</div>
+                <div id="capLine2">…but it’s just the <span class="capEm">stack</span> doing the work.</div>
+              </div>
+            </div>
+
+            <!-- PROGRESS -->
+            <div id="progress" aria-hidden="true">
+              <div id="progBar"><div id="progFill"></div></div>
+              <div id="ticks">
+                <div class="tick"><strong>Hook</strong></div>
+                <div class="tick">Idea</div>
+                <div class="tick">Example</div>
+                <div class="tick">Base Case</div>
+                <div class="tick">Unwind</div>
+                <div class="tick"><strong>Takeaway</strong></div>
+              </div>
+            </div>
+
+            <!-- CONTROLS -->
+            <div id="controls" aria-label="Playback controls">
+              <div class="ctrlRow">
+                <button class="ctrl small" id="btnRestart" title="Restart">Restart</button>
+                <button class="ctrl small" id="btnPlay" title="Play/Pause">Pause</button>
+                <button class="ctrl small" id="btnSafe" title="Toggle Safe Area">Safe</button>
+              </div>
+              <input id="scrub" type="range" min="0" max="56" step="0.01" value="0" aria-label="Scrub timeline" />
+            </div>
+
+            <!-- SAFE AREA OVERLAY -->
+            <div id="safeArea" aria-hidden="true">
+              <div id="safeRect"></div>
+              <div id="safeLabel">SAFE AREA (toggle)</div>
+            </div>
+
+            <!-- Reduced motion hint (only if applicable) -->
+            <div id="rmHint" aria-hidden="true">Reduced motion enabled in OS settings.</div>
+
+          </div>
+        </div>
+
+        <!-- START OVERLAY -->
+        <div id="startOverlay" role="dialog" aria-label="Start">
+          <div id="startCard">
+            <h1 id="startTitle"><span class="capEm">Ready</span> to screen-record</h1>
+            <div id="startSub">Auto-plays on load. If motion is paused, click Start.</div>
+            <button id="startBtn">Start ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voiceover script (timestamped) -->
+  <script type="text/plain" id="voiceover">
+00:00 [whoosh] “Recursion is just a function calling itself…”
+00:01 “BUT the stack is the real story.” [slam]
+00:03 “Recursion means: solve a problem by solving a smaller version of itself.”
+00:06 “Two parts: a smaller step… and a base case — the safety brake.” [click]
+00:09 “Let’s watch factorial of four: fact(4).”
+00:11 “It can’t finish yet, so it calls fact(3).” [whoosh]
+00:15 “fact(3) calls fact(2).” [whoosh]
+00:19 “fact(2) calls fact(1).” [whoosh]
+00:30 “Base case! When n is 1, we stop and return 1.” [ding]
+00:33 “Now we unwind: fact(2) returns 2 times 1… equals 2.” [pop]
+00:36 “fact(3) returns 3 times 2… equals 6.” [pop]
+00:39 “fact(4) returns 4 times 6… equals 24.” [big pop]
+00:46 “That’s recursion: build the stack going down…”
+00:49 “…then returns travel back up to finish the job.”
+00:52 “Remember: Base case + smaller step.”
+00:56 “Want Fibonacci next? Comment ‘FIB’.” [end whoosh]
+  </script>
+
+  <script>
+    /*
+      TIMELINE PLAN (approx 56s total)
+      0.0–2.0  Scene 1: Hook (slam frames, bold statement)
+      2.0–8.0  Scene 2: Define recursion + base case as brake
+      8.0–30.0 Scene 3: factorial(4) calls: push frames at 10,14,18,22; keep beats
+      30.0–45.0 Scene 4: base case hits (30–32), unwind returns 1→2→6→24 (32–44)
+      45.0–56.0 Scene 5: Summary + 2 rules + end CTA
+    */
+
+    // ---------- Utilities ----------
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const invLerp = (a, b, v) => (v - a) / (b - a);
+    const smoothstep = (t) => t * t * (3 - 2 * t);
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+    const easeIn = (t) => Math.pow(t, 3);
+    const easeInOut = (t) => (t < .5) ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const easeBackOut = (t) => {
+      const c1 = 1.70158, c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    };
+
+    function fmtTime(sec){
+      sec = Math.max(0, sec);
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${String(s).padStart(2,'0')}`;
+    }
+
+    // ---------- Elements ----------
+    const root = document.documentElement;
+    const stageWrap = document.getElementById('stageWrap');
+    const scene = document.getElementById('scene');
+    const statusText = document.getElementById('statusText');
+    const timeReadout = document.getElementById('timeReadout');
+
+    const cap1 = document.getElementById('capLine1');
+    const cap2 = document.getElementById('capLine2');
+
+    const progFill = document.getElementById('progFill');
+    const scrub = document.getElementById('scrub');
+
+    const btnRestart = document.getElementById('btnRestart');
+    const btnPlay = document.getElementById('btnPlay');
+    const btnSafe = document.getElementById('btnSafe');
+
+    const safeArea = document.getElementById('safeArea');
+
+    const startOverlay = document.getElementById('startOverlay');
+    const startBtn = document.getElementById('startBtn');
+
+    const summary = document.getElementById('summary');
+    const endCard = document.getElementById('endCard');
+
+    const codeLines = Array.from(document.querySelectorAll('#code .line'));
+    const frames = [
+      document.getElementById('f0'),
+      document.getElementById('f1'),
+      document.getElementById('f2'),
+      document.getElementById('f3')
+    ];
+    const retVals = Array.from(document.querySelectorAll('.retVal'));
+    const bubble = document.getElementById('valueBubble');
+    const stackDeck = document.getElementById('stackDeck');
+
+    // ---------- Playback state ----------
+    const DURATION = 56.0;
+    let t = 0;
+    let playing = true;
+    let lastTS = null;
+    let dragging = false;
+    let captionKey = '';
+
+    // OS reduced motion hint (still runs, but we show a note)
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const rmHint = document.getElementById('rmHint');
+    if (prefersReduced){
+      rmHint.style.opacity = 1;
+      rmHint.setAttribute('aria-hidden', 'false');
+    }
+
+    // ---------- Stage scaling ----------
+    function fitStage(){
+      const W = 2160, H = 3840;
+      const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+      root.style.setProperty('--scale', s.toFixed(6));
+    }
+    window.addEventListener('resize', fitStage, {passive:true});
+    fitStage();
+
+    // ---------- Caption system (minimal DOM changes) ----------
+    function setCaption(key, line1, line2){
+      if (captionKey === key) return;
+      captionKey = key;
+
+      // quick kinetic typography: tiny dip + snap
+      cap1.style.transition = 'none';
+      cap2.style.transition = 'none';
+      cap1.style.opacity = '0';
+      cap2.style.opacity = '0';
+      cap1.style.transform = 'translateY(16px) scale(.99)';
+      cap2.style.transform = 'translateY(16px) scale(.99)';
+      cap1.innerHTML = line1;
+      cap2.innerHTML = line2;
+
+      requestAnimationFrame(() => {
+        cap1.style.transition = 'transform .42s cubic-bezier(.2,1.25,.25,1), opacity .28s cubic-bezier(.12,.92,.2,1)';
+        cap2.style.transition = 'transform .46s cubic-bezier(.2,1.25,.25,1), opacity .30s cubic-bezier(.12,.92,.2,1)';
+        cap1.style.opacity = '1';
+        cap2.style.opacity = '1';
+        cap1.style.transform = 'translateY(0px) scale(1)';
+        cap2.style.transform = 'translateY(0px) scale(1)';
+      });
+    }
+
+    // ---------- Code highlighting ----------
+    function clearHighlights(){
+      for (const ln of codeLines) ln.classList.remove('hl','hlBase','hlReturn');
+    }
+    function highlight(lineNums, cls){
+      clearHighlights();
+      for (const n of lineNums){
+        const el = codeLines.find(x => x.dataset.line === String(n));
+        if (el) el.classList.add(cls);
+      }
+    }
+
+    // ---------- Stack frame positioning ----------
+    // Base positions (in deck space)
+    const baseY = [0, 300, 600, 900]; // top to bottom stack steps
+    function setFramePose(i, y, alpha, scale, rot, z){
+      const f = frames[i];
+      f.style.opacity = alpha.toFixed(3);
+      f.style.transform =
+        `translateY(${y.toFixed(1)}px) scale(${scale.toFixed(3)}) rotateX(${rot.toFixed(2)}deg) translateZ(${z.toFixed(1)}px)`;
+    }
+    function setActiveFrame(idx, mode){
+      // mode: 'none'|'active'|'base'
+      frames.forEach((f, i) => {
+        f.classList.remove('active','base');
+        if (i === idx){
+          if (mode === 'active') f.classList.add('active');
+          if (mode === 'base') f.classList.add('base');
+        }
+      });
+    }
+    function showReturnValue(i, show, emphasis=0){
+      const rv = retVals.find(x => x.dataset.ret === String(i));
+      if (!rv) return;
+      const a = show ? 1 : 0;
+      const s = show ? (1 + 0.06 * emphasis) : 0.98;
+      const y = show ? (0 - 8 * emphasis) : 20;
+      rv.style.opacity = a.toFixed(3);
+      rv.style.transform = `translateY(${y.toFixed(1)}px) scale(${s.toFixed(3)})`;
+      rv.style.filter = `drop-shadow(0 ${10 + 14*emphasis}px ${30 + 70*emphasis}px rgba(52,211,153,${0.10 + 0.14*emphasis}))`;
+    }
+
+    // ---------- Timeline beats ----------
+    const PUSH = [10, 14, 18, 22]; // start times
+    const PUSH_D = 0.9;
+
+    const BASE_HIT = 30.0;
+
+    // Return / unwind sequence (from deepest to top)
+    const RET = [
+      {t: 32.0, from: 3, to: 2, val: 1},
+      {t: 35.0, from: 2, to: 1, val: 2},
+      {t: 38.0, from: 1, to: 0, val: 6},
+      {t: 41.0, from: 0, to: -1, val: 24},
+    ];
+    const RET_D = 1.05; // bubble travel duration
+
+    // ---------- Scene rendering ----------
+    function render(time){
+      // Progress + time
+      const p = clamp(time / DURATION, 0, 1);
+      root.style.setProperty('--p', (p*100).toFixed(2) + '%');
+      timeReadout.textContent = fmtTime(time);
+
+      // Continuous subtle "camera" motion (non-nauseating)
+      const wob = Math.sin(time * 0.9) * 0.7;
+      const wob2 = Math.cos(time * 0.7) * 0.6;
+
+      // Scene-based camera framing
+      let camX = 0, camY = 0, rotX = 8, rotY = -8, zoom = 1.0;
+
+      // Make stack deck gently parallax
+      const deckRotX = 10 + wob * 0.7;
+      const deckRotY = -10 + wob2 * 0.7;
+      stackDeck.style.transform = `rotateX(${deckRotX.toFixed(2)}deg) rotateY(${deckRotY.toFixed(2)}deg) translateZ(0)`;
+
+      // Default: hide summary/end
+      summary.style.opacity = '0';
+      summary.style.transform = 'translateY(20px) scale(.99)';
+      endCard.style.opacity = '0';
+      endCard.style.transform = 'translateY(20px) scale(.99)';
+
+      // Default: return values hidden
+      for (let i=0;i<4;i++) showReturnValue(i, false, 0);
+
+      // ---------- Captions + emphasis ----------
+      if (time < 2.0){
+        // Scene 1: Hook
+        setCaption('hook',
+          `Recursion is just a function… <span class="capEm">calling itself</span>`,
+          `BUT the <span class="capEm">stack</span> is the real story.`
+        );
+        highlight([1,4],'hl');
+
+        const k = easeOut(clamp(time/2.0, 0, 1));
+        zoom = lerp(1.04, 1.00, k);
+        rotX = lerp(16, 8, k);
+        rotY = lerp(-16, -8, k);
+        camY = lerp(90, 0, k);
+
+      } else if (time < 8.0){
+        // Scene 2: Define + base case brake
+        setCaption('idea',
+          `Recursion = solve it… with a <span class="capEm">smaller</span> version`,
+          `And a <span class="capWarn">base case</span> — the safety brake.`
+        );
+
+        // Beat changes every ~2s
+        if (time < 4.2) highlight([4], 'hl');
+        else if (time < 6.2) highlight([2,3], 'hlBase');
+        else highlight([1,2,4], 'hl');
+
+        const k = easeInOut(clamp(invLerp(2, 8, time), 0, 1));
+        zoom = lerp(1.00, 1.02, k);
+        rotX = lerp(8, 10, k) + wob*0.6;
+        rotY = lerp(-8, -6, k) + wob2*0.6;
+        camX = lerp(-20, 10, k);
+        camY = lerp(10, -10, k);
+
+      } else if (time < BASE_HIT){
+        // Scene 3: Push frames
+        setCaption('example',
+          `Watch <span class="capEm">fact(4)</span> build the stack…`,
+          `Each call <span class="capEm">pauses</span> until the smaller one returns.`
+        );
+
+        // Code highlight rhythm during pushes
+        const beat = Math.floor((time - 8) / 2.2); // changes often
+        if (beat % 3 === 0) highlight([1], 'hl');
+        else if (beat % 3 === 1) highlight([4], 'hl');
+        else highlight([2,3], 'hlBase');
+
+        // Camera shifts slightly on each push
+        camX = Math.sin((time-8)*0.6) * 24;
+        camY = Math.cos((time-8)*0.5) * 22;
+        rotX = 9 + wob*0.8;
+        rotY = -8 + wob2*0.8;
+        zoom = 1.015;
+
+      } else if (time < 45.0){
+        // Scene 4: Base case + unwind
+        if (time < 32.0){
+          setCaption('base',
+            `<span class="capWarn">Base case!</span> n == 1`,
+            `Stop calling. Return <span class="capEm">1</span>.`
+          );
+          highlight([2,3], 'hlBase');
+        } else {
+          setCaption('unwind',
+            `Now we <span class="capEm">unwind</span>… returns travel upward`,
+            `1 → 2 → 6 → <span class="capEm">24</span>`
+          );
+          highlight([4], 'hlReturn');
+        }
+
+        const k = easeInOut(clamp(invLerp(BASE_HIT, 45, time), 0, 1));
+        zoom = lerp(1.03, 1.01, k);
+        rotX = lerp(12, 8, k) + wob*0.55;
+        rotY = lerp(-4, -8, k) + wob2*0.55;
+        camX = lerp(18, 0, k);
+        camY = lerp(-10, 0, k);
+      } else {
+        // Scene 5: Summary + CTA
+        setCaption('takeaway',
+          `Two rules: <span class="capWarn">Base case</span> + <span class="capEm">Smaller step</span>`,
+          `If you have both — recursion is safe and predictable.`
+        );
+        highlight([2,3], 'hlBase');
+
+        // Reveal summary + end card
+        const ks = easeOut(clamp(invLerp(45, 50, time), 0, 1));
+        summary.style.opacity = String(ks);
+        summary.style.transform = `translateY(${lerp(22, 0, ks).toFixed(1)}px) scale(${lerp(.99, 1, ks).toFixed(3)})`;
+
+        const ke = easeOut(clamp(invLerp(50, 56, time), 0, 1));
+        endCard.style.opacity = String(ke);
+        endCard.style.transform = `translateY(${lerp(26, 0, ke).toFixed(1)}px) scale(${lerp(.99, 1, ke).toFixed(3)})`;
+
+        zoom = 1.02;
+        rotX = 10 + wob*0.55;
+        rotY = -6 + wob2*0.55;
+        camY = -20;
+      }
+
+      // Apply camera transform
+      scene.style.transform =
+        `translate3d(${camX.toFixed(1)}px, ${camY.toFixed(1)}px, 0px)
+         rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)
+         scale(${zoom.toFixed(4)})`;
+
+      // ---------- Stack frames: push phase ----------
+      // Start hidden
+      for (let i=0;i<4;i++){
+        setFramePose(i, baseY[i] + 160, 0, 0.96, 0, 0);
+      }
+      setActiveFrame(-1,'none');
+
+      // Push animations: each frame appears and settles
+      for (let i=0;i<4;i++){
+        const start = PUSH[i];
+        const end = start + PUSH_D;
+        const appear = clamp(invLerp(start, end, time), 0, 1);
+        const k = easeBackOut(appear);
+
+        // If time is before push, keep hidden
+        const isVisible = time >= start - 0.05;
+        const alpha = isVisible ? clamp(appear * 1.05, 0, 1) : 0;
+
+        // "slam" overshoot
+        const y = lerp(baseY[i] + 160, baseY[i], k);
+        const sc = lerp(0.96, 1.00, k);
+        const rot = lerp(2, 0, k);
+        const z = lerp(40, 0, k);
+
+        setFramePose(i, y, alpha, sc, rot, z);
+      }
+
+      // During deepening, mark current active top
+      let deepest = -1;
+      for (let i=0;i<4;i++){
+        if (time >= PUSH[i] + 0.15) deepest = i;
+      }
+
+      // Base case spotlight
+      if (time >= BASE_HIT && time < 32.0){
+        deepest = 3;
+        setActiveFrame(3,'base');
+      } else if (deepest >= 0 && time < BASE_HIT){
+        setActiveFrame(deepest,'active');
+      }
+
+      // ---------- Unwind phase ----------
+      // After base hit, we "pop" frames with return values
+      // We'll interpret "popped" as: fade/slide out downward slightly, while upper frames remain.
+      // Return timings: RET array (bubble travels from from->to).
+      if (time >= 32.0){
+        // Determine which returns have completed
+        // stage: 0 none, 1 first return started, etc.
+        const bubbleActive = RET.findIndex(r => time >= r.t && time <= r.t + RET_D);
+        const completedCount = RET.filter(r => time > r.t + RET_D*0.90).length;
+
+        // Frames visible baseline after pushes
+        // But we reduce visibility for popped frames from bottom as returns complete
+        // Return order: from 3 -> 2 -> 1 -> 0
+        // completedCount 0 => none popped, 1 => f3 popped, 2 => f2 popped, etc.
+        const popped = [false,false,false,false];
+        if (completedCount >= 1) popped[3] = true;
+        if (completedCount >= 2) popped[2] = true;
+        if (completedCount >= 3) popped[1] = true;
+        if (completedCount >= 4) popped[0] = true;
+
+        // Animate popping / revealing return values:
+        // Show return value on the frame that is "finishing" just before it pops.
+        for (let i=0;i<4;i++){
+          // If frame is popped, fade it away
+          if (popped[i]){
+            const popStart = RET[Math.min(3, 4 - i - 1)].t + RET_D*0.55; // rough alignment
+            const popK = easeInOut(clamp(invLerp(popStart, popStart + 0.55, time), 0, 1));
+            const alpha = lerp(1, 0, popK);
+            const y = lerp(baseY[i], baseY[i] + 180, popK);
+            const sc = lerp(1, 0.96, popK);
+            setFramePose(i, y, alpha, sc, 0, 0);
+          } else {
+            // Still present
+            // Slight lift on remaining frames as the stack unwinds
+            const lift = Math.min(completedCount, 4) * -12;
+            setFramePose(i, baseY[i] + lift, 1, 1, 0, 0);
+          }
+        }
+
+        // Current active frame during unwind (the one receiving return)
+        // We'll set active on 'to' frame while bubble travels.
+        if (bubbleActive >= 0){
+          const r = RET[bubbleActive];
+          setActiveFrame(r.to >= 0 ? r.to : 0, 'active');
+
+          // Bubble travel
+          const bk = easeInOut(clamp(invLerp(r.t, r.t + RET_D, time), 0, 1));
+          const fromY = baseY[r.from] + 80;
+          const toY = (r.to >= 0 ? baseY[r.to] : (baseY[0] - 220)) + 80;
+
+          const bx = 980; // within stackArea relative; tuned visually
+          const by = lerp(fromY, toY, bk);
+
+          bubble.textContent = String(r.val);
+          const a = (bk < 0.1) ? smoothstep(bk/0.1) : (bk > 0.92 ? smoothstep((1-bk)/0.08) : 1);
+          const sc = lerp(0.92, 1.02, (bk < 0.5 ? bk*2 : (1-bk)*2));
+          bubble.style.opacity = (a).toFixed(3);
+          bubble.style.transform = `translate3d(${bx.toFixed(1)}px, ${by.toFixed(1)}px, 0) scale(${sc.toFixed(3)})`;
+
+          // Reveal return value on the receiver frame near the end of travel
+          if (bk > 0.70 && r.to >= 0){
+            showReturnValue(r.to, true, clamp((bk - 0.70)/0.30, 0, 1));
+          }
+          // Final result pop on top frame (24)
+          if (r.to === -1 && bk > 0.70){
+            showReturnValue(0, true, clamp((bk - 0.70)/0.30, 0, 1));
+          }
+        } else {
+          bubble.style.opacity = '0';
+          bubble.style.transform = `translate3d(980px, ${baseY[3] + 80}px, 0) scale(.92)`;
+
+          // After all returns, show final 24 strongly on top
+          if (completedCount >= 4){
+            setActiveFrame(0,'active');
+            showReturnValue(0, true, 1);
+          } else {
+            // Show whichever is latest completed as a subtle hint
+            if (completedCount === 1) showReturnValue(2, true, 0.35);
+            if (completedCount === 2) showReturnValue(1, true, 0.35);
+            if (completedCount === 3) showReturnValue(0, true, 0.45);
+          }
+        }
+      } else {
+        // Before unwind begins, bubble hidden
+        bubble.style.opacity = '0';
+      }
+
+      // ---------- Controls / scrub ----------
+      if (!dragging){
+        scrub.value = String(time.toFixed(2));
+      }
+    }
+
+    // ---------- Playback loop ----------
+    function tick(ts){
+      if (lastTS == null) lastTS = ts;
+
+      const dt = (ts - lastTS) / 1000;
+      lastTS = ts;
+
+      if (playing){
+        // Slightly faster perceived pacing (tight rhythm) without shortening duration:
+        // keep real-time, but micro-beats driven by render() changes.
+        t += dt;
+        if (t > DURATION) t = DURATION;
+      }
+
+      render(t);
+
+      // Update UI
+      statusText.textContent = playing ? 'PLAYING' : 'PAUSED';
+      btnPlay.textContent = playing ? 'Pause' : 'Play';
+
+      requestAnimationFrame(tick);
+    }
+
+    // ---------- Controls ----------
+    btnRestart.addEventListener('click', () => {
+      t = 0; playing = true;
+      lastTS = null;
+      startOverlay.classList.add('hidden');
+    });
+
+    btnPlay.addEventListener('click', () => {
+      playing = !playing;
+      startOverlay.classList.add('hidden');
+    });
+
+    btnSafe.addEventListener('click', () => {
+      safeArea.classList.toggle('on');
+      startOverlay.classList.add('hidden');
+    });
+
+    scrub.addEventListener('pointerdown', () => { dragging = true; });
+    scrub.addEventListener('pointerup', () => { dragging = false; startOverlay.classList.add('hidden'); });
+    scrub.addEventListener('input', (e) => {
+      t = clamp(parseFloat(e.target.value), 0, DURATION);
+      render(t);
+    });
+
+    // Space = play/pause, R = restart, S = safe
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space'){
+        e.preventDefault();
+        playing = !playing;
+        startOverlay.classList.add('hidden');
+      } else if (e.key.toLowerCase() === 'r'){
+        t = 0; playing = true; lastTS = null;
+        startOverlay.classList.add('hidden');
+      } else if (e.key.toLowerCase() === 's'){
+        safeArea.classList.toggle('on');
+        startOverlay.classList.add('hidden');
+      }
+    });
+
+    // Start overlay
+    startBtn.addEventListener('click', () => {
+      playing = true;
+      startOverlay.classList.add('hidden');
+    });
+    // Clicking anywhere starts (nice for mobile)
+    startOverlay.addEventListener('click', (e) => {
+      if (e.target === startOverlay){
+        playing = true;
+        startOverlay.classList.add('hidden');
+      }
+    });
+
+    // Auto-play attempt (no media, so this should run immediately)
+    // Keep overlay visible briefly, then hide to feel "premium"
+    function autoStart(){
+      playing = true;
+      render(0);
+      // Hide overlay quickly unless user prefers reduced motion (keep it visible a touch longer)
+      const delay = prefersReduced ? 700 : 350;
+      setTimeout(() => startOverlay.classList.add('hidden'), delay);
+    }
+
+    // Kick off loop
+    requestAnimationFrame(tick);
+    autoStart();
+  </script>
+</body>
+</html>
